@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4e6232">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Schindlergooses">
+<title>Schindlergooses</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+
+<!-- Firebase compat (works without bundler / local file) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<style>
+  :root {
+    --bg:       #f4efe6;
+    --surface:  #fdfaf4;
+    --surface2: #ede8db;
+    --border:   #d8d0be;
+    --accent:   #4e6232;
+    --accent2:  #8b4e2f;
+    --text:     #28200f;
+    --muted:    #9a8f7a;
+    --danger:   #a33b2a;
+    --r:        20px;
+    --r-sm:     13px;
+    --sh:       0 2px 16px rgba(44,36,24,0.09);
+  }
+
+  /* Dark mode intentionally disabled – light only */
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100%;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 40px);
+  }
+
+  /* ─── HEADER ─── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1.5px solid var(--border);
+    padding: 14px 18px 12px;
+    padding-top: calc(env(safe-area-inset-top) + 14px);
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: var(--sh);
+  }
+
+  .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .logo-wrap    { display: flex; align-items: center; gap: 10px; }
+
+  .goose-badge {
+    width: 44px; height: 44px;
+    background: var(--accent); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+
+  .logo-text { display: flex; flex-direction: column; gap: 1px; }
+  .logo-name { font-size: 18px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; line-height: 1.1; }
+  .logo-name span { color: var(--accent); }
+  .logo-sub  { font-size: 10px; font-weight: 500; color: var(--muted); letter-spacing: 1.2px; text-transform: uppercase; }
+
+  .icon-btn {
+    width: 44px; height: 44px;
+    background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 18px; color: var(--muted); flex-shrink: 0;
+    transition: border-color 0.2s;
+  }
+  .icon-btn:active { border-color: var(--accent); opacity: 0.7; }
+
+  /* ─── SYNC ─── */
+  .sync-bar {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 16px; font-size: 11px; font-weight: 500; color: var(--muted);
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .sync-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0;
+  }
+  .sync-dot.ok      { background: #5cb85c; }
+  .sync-dot.syncing { background: #e6a817; animation: blink 1s infinite; }
+  .sync-dot.error   { background: var(--danger); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ─── WEEK NAV ─── */
+  .week-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 14px 16px 0;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--r); overflow: hidden; box-shadow: var(--sh);
+  }
+  .week-btn {
+    min-width: 56px; height: 52px; background: none; border: none;
+    color: var(--muted); font-size: 22px; font-family: inherit;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .week-btn:active { background: var(--surface2); color: var(--accent); }
+  .week-label-wrap { flex: 1; text-align: center; }
+  .week-label-main { font-size: 14px; font-weight: 700; color: var(--text); display: block; }
+  .week-label-sub  { font-size: 10px; font-weight: 500; color: var(--muted); display: block; }
+
+  /* ─── OVERVIEW ─── */
+  .overview { margin: 10px 16px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ov-item  { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r-sm); padding: 12px 14px; box-shadow: var(--sh); }
+  .ov-label { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .ov-val   { font-size: 26px; font-weight: 800; line-height: 1; }
+  .ov-val.rico { color: var(--accent); }
+  .ov-val.ana  { color: var(--accent2); }
+
+  /* ─── DAYS ─── */
+  .days { padding: 10px 16px 0; display: flex; flex-direction: column; gap: 8px; }
+
+  .day-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--r); box-shadow: var(--sh); overflow: hidden;
+  }
+  .day-card.today { border-color: var(--accent); }
+
+  .day-hd {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px; cursor: pointer; user-select: none; min-height: 60px;
+  }
+  .day-hd-left { display: flex; align-items: center; gap: 10px; }
+  .day-name { font-size: 16px; font-weight: 800; }
+  .day-date { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .today-tag {
+    background: var(--accent); color: #fff;
+    font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 50px;
+  }
+  .day-hd-right { display: flex; align-items: center; gap: 5px; }
+
+  .pill { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 50px; }
+  .pill-t { background: rgba(78,98,50,0.12); color: var(--accent); border: 1px solid rgba(78,98,50,0.22); }
+  .pill-f { background: rgba(139,78,47,0.1); color: var(--accent2); border: 1px solid rgba(139,78,47,0.2); }
+
+  .chevron { font-size: 14px; color: var(--muted); transition: transform 0.25s; flex-shrink: 0; }
+  .day-card.open .chevron { transform: rotate(180deg); }
+
+  .day-bd { display: none; padding: 0 18px 20px; }
+  .day-card.open .day-bd { display: block; }
+
+  .hr { height: 1px; background: var(--border); margin-bottom: 16px; }
+
+  .mod-label { font-size: 11px; color: var(--muted); font-weight: 500; margin-bottom: 14px; display: flex; align-items: center; gap: 5px; }
+
+  .sec { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 10px; }
+
+  /* ─── TRANSPORT ─── */
+  .transport-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+
+  .t-chip {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-radius: var(--r-sm);
+    border: 1.5px solid var(--border); background: var(--surface2);
+    cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600;
+    color: var(--muted); width: 100%; text-align: left; transition: all 0.15s;
+  }
+  .t-chip:active { opacity: 0.7; }
+  .t-chip.sel-rico    { border-color: var(--accent);  color: var(--accent);  background: rgba(78,98,50,0.09); }
+  .t-chip.sel-ana     { border-color: var(--accent2); color: var(--accent2); background: rgba(139,78,47,0.09); }
+  .t-chip.sel-neutral { border-color: var(--muted);   color: var(--text);    background: var(--surface2); }
+  .t-chip-icon { font-size: 20px; flex-shrink: 0; }
+
+  /* ─── ABFAHRT ─── */
+  .abfahrt-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; background: var(--surface2);
+    border: 1.5px solid var(--border); border-radius: var(--r-sm); margin-bottom: 16px;
+  }
+  .abfahrt-label { font-size: 13px; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+  .abfahrt-input {
+    background: none; border: none; outline: none;
+    font-family: inherit; font-size: 24px; font-weight: 800;
+    color: var(--text); flex: 1; cursor: pointer; min-width: 0;
+  }
+  .abfahrt-input::-webkit-datetime-edit-ampm-field { display: none !important; }
+  .abfahrt-input::-webkit-calendar-picker-indicator { opacity: 0.3; cursor: pointer; width: 24px; height: 24px; }
+
+  /* ─── FOOD ─── */
+  .food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .f-card {
+    border-radius: var(--r-sm); border: 1.5px solid var(--border); background: var(--surface2);
+    padding: 13px 14px; cursor: pointer; min-height: 64px;
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; transition: all 0.15s;
+  }
+  .f-card:active { opacity: 0.7; }
+  .f-card.sel-rico { border-color: var(--accent);  background: rgba(78,98,50,0.09); }
+  .f-card.sel-ana  { border-color: var(--accent2); background: rgba(139,78,47,0.09); }
+  .f-card.sel-cafe { border-color: var(--muted);   background: var(--surface); }
+  .f-card.cafe-card { grid-column: span 2; min-height: 52px; margin-top: 0; }
+
+  .f-who { font-size: 10px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; }
+  .f-who.rico  { color: var(--accent); }
+  .f-who.ana   { color: var(--accent2); }
+  .f-who.muted { color: var(--muted); }
+  .f-lbl { font-size: 13px; font-weight: 600; color: var(--text); }
+
+  /* ─── NOTE ─── */
+  .note-input {
+    width: 100%; margin-top: 10px;
+    background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--r-sm);
+    color: var(--text); font-family: inherit; font-size: 14px;
+    padding: 13px 15px; resize: none; outline: none; min-height: 56px; line-height: 1.5;
+  }
+  .note-input:focus { border-color: var(--accent); }
+  .note-input::placeholder { color: var(--muted); }
+
+  /* ─── BOTTOM ─── */
+  .bottom { padding: 20px 16px 0; display: flex; justify-content: center; }
+  .reset-btn {
+    background: none; border: 1.5px solid var(--border); color: var(--muted);
+    padding: 13px 28px; border-radius: 50px;
+    font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; min-height: 48px;
+  }
+  .reset-btn:active { border-color: var(--danger); color: var(--danger); }
+
+  /* ─── SETTINGS SHEET ─── */
+  .sheet-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45); z-index: 200;
+    align-items: flex-end; justify-content: center;
+  }
+  .sheet-overlay.open { display: flex; }
+  .sheet {
+    background: var(--surface); border-radius: 24px 24px 0 0;
+    padding: 28px 20px;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 28px);
+    width: 100%; max-width: 480px;
+    border-top: 1.5px solid var(--border);
+    animation: slideUp 0.22s ease; position: relative;
+  }
+  @keyframes slideUp { from{transform:translateY(50px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .sheet-title { font-size: 18px; font-weight: 800; margin-bottom: 22px; }
+  .sheet-close {
+    position: absolute; top: 20px; right: 20px;
+    background: var(--surface2); border: 1.5px solid var(--border);
+    border-radius: 50%; width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 15px; color: var(--muted);
+  }
+  .field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+  .field-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .field-input {
+    background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--r-sm);
+    color: var(--text); font-family: inherit; font-size: 16px; font-weight: 600;
+    padding: 14px 16px; outline: none; width: 100%; min-height: 52px;
+  }
+  .field-input:focus { border-color: var(--accent); }
+  .iam-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .iam-btn {
+    padding: 14px; border-radius: var(--r-sm); border: 1.5px solid var(--border);
+    background: var(--surface2); font-family: inherit; font-size: 14px; font-weight: 700;
+    color: var(--muted); cursor: pointer; min-height: 52px;
+  }
+  .iam-btn.sel-rico { border-color: var(--accent);  color: var(--accent);  background: rgba(78,98,50,0.1); }
+  .iam-btn.sel-ana  { border-color: var(--accent2); color: var(--accent2); background: rgba(139,78,47,0.1); }
+  .save-btn {
+    width: 100%; background: var(--accent); color: #fff; border: none;
+    border-radius: var(--r-sm); padding: 16px; font-size: 15px; font-weight: 700;
+    font-family: inherit; cursor: pointer; margin-top: 4px; min-height: 54px;
+  }
+  .save-btn:active { opacity: 0.82; }
+
+  /* ─── NOTIFICATION ─── */
+  .notif-btn {
+    width: 100%; background: var(--surface2); color: var(--text); border: 1.5px solid var(--border);
+    border-radius: var(--r-sm); padding: 14px; font-size: 14px; font-weight: 600;
+    font-family: inherit; cursor: pointer; min-height: 50px;
+  }
+  .notif-btn.active { background: rgba(78,98,50,0.12); border-color: var(--accent); color: var(--accent); }
+  .notif-btn:active { opacity: 0.75; }
+  .notif-status { font-size: 11px; color: var(--muted); text-align: center; margin-top: 7px; min-height: 16px; }
+</style>
+</head>
+<body>
+
+<!-- Settings Sheet -->
+<div class="sheet-overlay" id="sheet" onclick="sheetBgClick(event)">
+  <div class="sheet">
+    <div class="sheet-close" onclick="closeSheet()">✕</div>
+    <div class="sheet-title">Einstellungen</div>
+    <div class="field">
+      <div class="field-label">Name Person 1</div>
+      <input class="field-input" id="nameRico" type="text" placeholder="Rico" autocomplete="off">
+    </div>
+    <div class="field">
+      <div class="field-label">Name Person 2</div>
+      <input class="field-input" id="nameAna" type="text" placeholder="Ana" autocomplete="off">
+    </div>
+    <div class="field">
+      <div class="field-label">Du bist</div>
+      <div class="iam-grid">
+        <button class="iam-btn" id="iAmRicoBtn" onclick="setIAm('rico')">Person 1</button>
+        <button class="iam-btn" id="iAmAnaBtn"  onclick="setIAm('ana')">Person 2</button>
+      </div>
+    </div>
+    <button class="save-btn" onclick="saveSettings()">Speichern</button>
+    <div style="margin-top:14px;">
+      <button class="notif-btn" id="notifBtn" onclick="handleNotifBtn()">🔔 Abend-Erinnerungen aktivieren</button>
+      <div class="notif-status" id="notifStatus"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-inner">
+    <div class="logo-wrap">
+      <div class="goose-badge">
+        <svg width="36" height="30" viewBox="0 0 36 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="9.5" cy="20" rx="6.5" ry="4.8" fill="white"/>
+          <ellipse cx="11.5" cy="14.5" rx="3" ry="2.5" fill="white"/>
+          <ellipse cx="12.5" cy="11.5" rx="2.2" ry="2" fill="white"/>
+          <path d="M14.5 11 L17 10.5 L14.5 12Z" fill="white"/>
+          <path d="M3.5 19 Q6 16 10 18" stroke="white" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.6"/>
+          <line x1="8" y1="24.5" x2="7.5" y2="28" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
+          <line x1="11" y1="24.5" x2="11.5" y2="28" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
+          <ellipse cx="26.5" cy="20.5" rx="6.5" ry="4.8" fill="white" opacity="0.82"/>
+          <ellipse cx="24.5" cy="15" rx="3" ry="2.5" fill="white" opacity="0.82"/>
+          <ellipse cx="23.5" cy="12" rx="2.2" ry="2" fill="white" opacity="0.82"/>
+          <path d="M21.5 11.5 L19 11 L21.5 12.8Z" fill="white" opacity="0.82"/>
+          <path d="M32.5 19.5 Q30 17 26 18.5" stroke="white" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.5"/>
+          <line x1="25" y1="25" x2="24.5" y2="28.5" stroke="white" stroke-width="1.4" stroke-linecap="round" opacity="0.8"/>
+          <line x1="28" y1="25" x2="28.5" y2="28.5" stroke="white" stroke-width="1.4" stroke-linecap="round" opacity="0.8"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <div class="logo-name">Schindler<span>gooses</span></div>
+        <div class="logo-sub" id="logoSub">Rico &amp; Ana</div>
+      </div>
+    </div>
+    <div class="icon-btn" onclick="openSheet()">⚙️</div>
+  </div>
+</div>
+
+<!-- Sync -->
+<div class="sync-bar">
+  <div class="sync-dot" id="syncDot"></div>
+  <span id="syncText">Verbinde…</span>
+</div>
+
+<!-- Week nav -->
+<div class="week-nav">
+  <button class="week-btn" onclick="changeWeek(-1)">‹</button>
+  <div class="week-label-wrap">
+    <span class="week-label-main" id="weekMain"></span>
+    <span class="week-label-sub"  id="weekSub"></span>
+  </div>
+  <button class="week-btn" onclick="changeWeek(1)">›</button>
+</div>
+
+<!-- Overview -->
+<div class="overview" id="overview"></div>
+
+<!-- Days -->
+<div class="days" id="days"></div>
+
+<!-- Bottom -->
+<div class="bottom">
+  <button class="reset-btn" onclick="resetWeek()">🗑 Diese Woche leeren</button>
+</div>
+
+<script>
+// ── Firebase init (compat SDK — works from local file) ──
+const firebaseConfig = {
+  apiKey:            "AIzaSyBtC4HBb01I5wFxi7b6wGrnWvRLoxZnGXc",
+  authDomain:        "schindlergooses.firebaseapp.com",
+  databaseURL:       "https://schindlergooses-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "schindlergooses",
+  storageBucket:     "schindlergooses.firebasestorage.app",
+  messagingSenderId: "247916300788",
+  appId:             "1:247916300788:web:226174e1941e98e0d211a1"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db    = firebase.database();
+const dbRef = db.ref('planner');
+
+// ── State ──
+const DAYS = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
+let weekOffset = 0;
+let data  = {};
+let iAm   = localStorage.getItem('sg-iam')   || 'rico';
+let names = JSON.parse(localStorage.getItem('sg-names') || '{"rico":"Rico","ana":"Ana"}');
+
+// ── Sync status ──
+function syncStatus(state, txt) {
+  document.getElementById('syncDot').className   = 'sync-dot ' + state;
+  document.getElementById('syncText').textContent = txt;
+}
+
+// Listen for realtime updates
+dbRef.on('value', snap => {
+  data = snap.val() || {};
+  syncStatus('ok', 'Synchronisiert');
+  render();
+}, () => syncStatus('error', 'Verbindungsfehler'));
+
+function push() {
+  syncStatus('syncing', 'Speichern…');
+  dbRef.set(data)
+    .then(()  => syncStatus('ok',    'Synchronisiert'))
+    .catch(()  => syncStatus('error', 'Fehler beim Speichern'));
+}
+
+// ── Date helpers ──
+function monday(offset) {
+  const n = new Date(), d = n.getDay()||7, m = new Date(n);
+  m.setDate(n.getDate() - d + 1 + offset*7);
+  m.setHours(0,0,0,0); return m;
+}
+function weekDates(offset) {
+  const m = monday(offset);
+  return Array.from({length:5}, (_,i) => { const d=new Date(m); d.setDate(m.getDate()+i); return d; });
+}
+function weekKey(offset)  { return monday(offset).toISOString().slice(0,10); }
+function isToday(d)       { return d.toDateString() === new Date().toDateString(); }
+function fmtDate(d)       { return d.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}); }
+
+// ── Entry helpers ──
+function entry(wk, i) {
+  if (!data[wk])    data[wk]    = {};
+  if (!data[wk][i]) data[wk][i] = {transport:null, food:[], cafeteria:false, abfahrt:'', note:'', by:null, at:null};
+  if (!Array.isArray(data[wk][i].food)) data[wk][i].food = [];
+  return data[wk][i];
+}
+function touch(e) { e.by = iAm; e.at = Date.now(); }
+function save()   { push(); updateOverview(); }
+
+// ── Actions ──
+function setTransport(wk, i, val) {
+  const e = entry(wk,i);
+  e.transport = e.transport===val ? null : val;
+  touch(e); save(); render();
+}
+function toggleFood(wk, i, key) {
+  const e = entry(wk,i), x = e.food.indexOf(key);
+  x>-1 ? e.food.splice(x,1) : e.food.push(key);
+  touch(e); save(); render();
+}
+function toggleCafe(wk, i) {
+  const e = entry(wk,i);
+  e.cafeteria = !e.cafeteria;
+  touch(e); save(); render();
+}
+function setAbfahrt(wk, i, val) { const e=entry(wk,i); e.abfahrt=val; touch(e); save(); }
+function setNote(wk, i, val)    { const e=entry(wk,i); e.note=val;    touch(e); save(); }
+function changeWeek(dir)         { weekOffset+=dir; render(); }
+function toggleDay(id)           { document.getElementById(id).classList.toggle('open'); }
+function resetWeek() {
+  if (!confirm('Diese Woche wirklich leeren?')) return;
+  delete data[weekKey(weekOffset)];
+  save(); render();
+}
+
+// ── Settings ──
+function openSheet() {
+  document.getElementById('nameRico').value = names.rico;
+  document.getElementById('nameAna').value  = names.ana;
+  refreshIAmBtns();
+  document.getElementById('sheet').classList.add('open');
+}
+function closeSheet()   { document.getElementById('sheet').classList.remove('open'); }
+function sheetBgClick(e){ if (e.target.id==='sheet') closeSheet(); }
+function setIAm(who)    { iAm=who; refreshIAmBtns(); }
+function refreshIAmBtns() {
+  document.getElementById('iAmRicoBtn').className = 'iam-btn'+(iAm==='rico'?' sel-rico':'');
+  document.getElementById('iAmAnaBtn').className  = 'iam-btn'+(iAm==='ana' ?' sel-ana' :'');
+}
+function saveSettings() {
+  names.rico = document.getElementById('nameRico').value.trim() || 'Rico';
+  names.ana  = document.getElementById('nameAna').value.trim()  || 'Ana';
+  localStorage.setItem('sg-names', JSON.stringify(names));
+  localStorage.setItem('sg-iam', iAm);
+  closeSheet(); render();
+}
+
+// ── Overview ──
+function updateOverview() {
+  const wk = weekKey(weekOffset);
+  let rD=0, aD=0, rB=0, aB=0;
+  for (let i=0;i<5;i++) {
+    const e = entry(wk,i);
+    if (e.transport && e.transport.includes(names.rico) && e.transport.includes('fährt')) rD++;
+    if (e.transport && e.transport.includes(names.ana)  && e.transport.includes('fährt')) aD++;
+    if (e.food.some(f=>f.startsWith('rico'))) rB++;
+    if (e.food.some(f=>f.startsWith('ana')))  aB++;
+  }
+  document.getElementById('overview').innerHTML = `
+    <div class="ov-item"><div class="ov-label">🚗 ${names.rico} fährt</div><div class="ov-val rico">${rD}×</div></div>
+    <div class="ov-item"><div class="ov-label">🚗 ${names.ana} fährt</div><div class="ov-val ana">${aD}×</div></div>
+    <div class="ov-item"><div class="ov-label">🥡 ${names.rico} bringt</div><div class="ov-val rico">${rB}×</div></div>
+    <div class="ov-item"><div class="ov-label">🥡 ${names.ana} bringt</div><div class="ov-val ana">${aB}×</div></div>`;
+}
+
+// ── Modified label ──
+function modLabel(e) {
+  if (!e.by || !e.at) return '';
+  const who  = e.by==='rico' ? names.rico : names.ana;
+  const diff = Date.now()-e.at;
+  const when = diff<60000     ? 'gerade eben'
+             : diff<3600000   ? `vor ${Math.floor(diff/60000)} Min.`
+             : diff<86400000  ? `vor ${Math.floor(diff/3600000)} Std.`
+             : `vor ${Math.floor(diff/86400000)} Tag(en)`;
+  return `<div class="mod-label">✏️ ${who} · ${when}</div>`;
+}
+
+// ── Summary pills ──
+function pills(e) {
+  let h='';
+  if (e.transport) {
+    const short = e.transport.includes('Zug') ? '🚆 Zug' : '🚗 '+e.transport.split(' ')[1];
+    h += `<span class="pill pill-t">${short}</span>`;
+  }
+  if (e.abfahrt) h+=`<span class="pill pill-t">⏱ ${e.abfahrt}</span>`;
+  if (e.food.length||e.cafeteria) h+=`<span class="pill pill-f">🥡</span>`;
+  return h;
+}
+
+// ── Main render ──
+function render() {
+  document.getElementById('logoSub').textContent = `${names.rico} & ${names.ana}`;
+
+  const wk    = weekKey(weekOffset);
+  const dates = weekDates(weekOffset);
+  document.getElementById('weekMain').textContent = `${fmtDate(dates[0])} – ${fmtDate(dates[4])}`;
+  document.getElementById('weekSub').textContent  = weekOffset===0 ? 'Diese Woche'
+    : weekOffset<0 ? `${Math.abs(weekOffset)} Woche${Math.abs(weekOffset)>1?'n':''} zurück`
+    : `In ${weekOffset} Woche${weekOffset>1?'n':''}`;
+
+  const TRANSPORT = [
+    { label:`🚗 ${names.rico} fährt`, icon:'🚗', text:`${names.rico} fährt`, who:'rico' },
+    { label:`🚗 ${names.ana} fährt`,  icon:'🚗', text:`${names.ana} fährt`,  who:'ana'  },
+    { label:'🚆 Zug',                  icon:'🚆', text:'Zug',                 who:'neutral' },
+  ];
+  const FOOD = [
+    { key:'rico-self', who:names.rico, lbl:'🥡 Bringt für sich',          cls:'sel-rico', wc:'rico' },
+    { key:'rico-ana',  who:names.rico, lbl:`🥡 Bringt für ${names.ana}`,  cls:'sel-rico', wc:'rico' },
+    { key:'ana-self',  who:names.ana,  lbl:'🥡 Bringt für sich',          cls:'sel-ana',  wc:'ana'  },
+    { key:'ana-rico',  who:names.ana,  lbl:`🥡 Bringt für ${names.rico}`, cls:'sel-ana',  wc:'ana'  },
+  ];
+
+  const open = {};
+  for (let i=0;i<5;i++) {
+    const el=document.getElementById(`day-${i}`);
+    if (el) open[i]=el.classList.contains('open');
+  }
+
+  document.getElementById('days').innerHTML = dates.map((date,i) => {
+    const e      = entry(wk,i);
+    const today  = isToday(date);
+    const isOpen = open[i]!==undefined ? open[i] : today;
+    const wkSafe = wk; // safe for inline handlers
+
+    const tChips = TRANSPORT.map(o => {
+      const sel = e.transport===o.label;
+      const cls = sel ? (o.who==='rico'?'sel-rico':o.who==='ana'?'sel-ana':'sel-neutral') : '';
+      const safeLbl = o.label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return `<button class="t-chip ${cls}" onclick="setTransport('${wkSafe}',${i},'${safeLbl}')">
+        <span class="t-chip-icon">${o.icon}</span>${o.text}
+      </button>`;
+    }).join('');
+
+    const fCards = FOOD.map(o => `
+      <div class="f-card${e.food.includes(o.key)?' '+o.cls:''}" onclick="toggleFood('${wkSafe}',${i},'${o.key}')">
+        <div class="f-who ${o.wc}">${o.who}</div>
+        <div class="f-lbl">${o.lbl}</div>
+      </div>`).join('');
+
+    return `
+    <div class="day-card${today?' today':''}${isOpen?' open':''}" id="day-${i}">
+      <div class="day-hd" onclick="toggleDay('day-${i}')">
+        <div class="day-hd-left">
+          <span class="day-name">${DAYS[i]}</span>
+          <span class="day-date">${fmtDate(date)}</span>
+          ${today?'<span class="today-tag">Heute</span>':''}
+        </div>
+        <div class="day-hd-right">${pills(e)}<span class="chevron">▾</span></div>
+      </div>
+      <div class="day-bd">
+        <div class="hr"></div>
+        ${modLabel(e)}
+
+        <div class="sec">Transport</div>
+        <div class="transport-grid">${tChips}</div>
+
+        <div class="sec">Abfahrt</div>
+        <div class="abfahrt-row">
+          <span class="abfahrt-label">⏰</span>
+          <input class="abfahrt-input" type="time" step="300" value="${e.abfahrt||''}"
+            onchange="setAbfahrt('${wkSafe}',${i},this.value)"/>
+        </div>
+
+        <div class="sec">Essen</div>
+        <div class="food-grid">
+          ${fCards}
+          <div class="f-card cafe-card${e.cafeteria?' sel-cafe':''}" onclick="toggleCafe('${wkSafe}',${i})">
+            <div class="f-who muted">Beide</div>
+            <div class="f-lbl">🍽️ Cafeteria</div>
+          </div>
+        </div>
+
+        <textarea class="note-input" placeholder="Notiz…"
+          onchange="setNote('${wkSafe}',${i},this.value)">${e.note||''}</textarea>
+      </div>
+    </div>`;
+  }).join('');
+
+  updateOverview();
+}
+
+// Initial render (shows skeleton until Firebase responds)
+render();
+syncStatus('syncing', 'Verbinde…');
+
+// ── Push Notifications ──────────────────────────────────────────────────────
+let swReg = null;
+
+async function initServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    swReg = await navigator.serviceWorker.register('./sw.js');
+    console.log('SW registered');
+    updateNotifUI();
+    startNotifTick();
+  } catch(e) {
+    console.warn('SW registration failed:', e);
+  }
+}
+
+function updateNotifUI() {
+  const btn    = document.getElementById('notifBtn');
+  const status = document.getElementById('notifStatus');
+  if (!btn) return;
+  const perm = Notification.permission;
+  if (perm === 'granted') {
+    btn.textContent = '🔔 Erinnerungen aktiv';
+    btn.classList.add('active');
+    status.textContent = 'Du erhältst jeden Abend um 19:00 Uhr eine Zusammenfassung für den nächsten Tag.';
+  } else if (perm === 'denied') {
+    btn.textContent = '🔕 Benachrichtigungen blockiert';
+    btn.classList.remove('active');
+    status.textContent = 'Bitte in den Browser-Einstellungen erlauben.';
+  } else {
+    btn.textContent = '🔔 Abend-Erinnerungen aktivieren';
+    btn.classList.remove('active');
+    status.textContent = 'Täglich um 19:00 – Zusammenfassung für den nächsten Arbeitstag.';
+  }
+}
+
+async function handleNotifBtn() {
+  if (!('Notification' in window)) {
+    alert('Dein Browser unterstützt keine Benachrichtigungen.');
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    // Test notification
+    sendTestNotification();
+    return;
+  }
+  const result = await Notification.requestPermission();
+  updateNotifUI();
+  if (result === 'granted') {
+    sendTestNotification();
+  }
+}
+
+function sendTestNotification() {
+  if (!swReg) return;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tDay = tomorrow.getDay();
+  if (tDay === 0 || tDay === 6) {
+    swReg.showNotification('🪿 Schindlergooses – Test', {
+      body: 'Erinnerungen aktiv! Nächste Benachrichtigung am nächsten Arbeitstag.',
+      icon: './icon.png', badge: './icon.png', tag: 'test'
+    });
+  } else {
+    checkAndFireNotification(true);
+  }
+}
+
+// Every minute, check if it's 19:00 → tell SW to evaluate
+function startNotifTick() {
+  setInterval(() => {
+    if (!swReg || !swReg.active) return;
+    if (Notification.permission !== 'granted') return;
+    swReg.active.postMessage({ type: 'CHECK_NOTIFICATION', firebaseData: data });
+  }, 60000); // every 60s
+}
+
+// Direct check + notification (used for test or manual trigger)
+async function checkAndFireNotification(force = false) {
+  if (!swReg) return;
+  const now = new Date();
+  const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  if (!force && hhmm !== '19:00') return;
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const tDay = tomorrow.getDay();
+  if (tDay === 0 || tDay === 6) return;
+
+  const dayIndex = tDay - 1;
+  const mon = new Date(tomorrow);
+  mon.setDate(tomorrow.getDate() - tDay + 1);
+  mon.setHours(0,0,0,0);
+  const weekKey = mon.toISOString().slice(0,10);
+
+  const DAYS_DE = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
+  const dayName = DAYS_DE[dayIndex];
+  const entry_  = data?.[weekKey]?.[dayIndex];
+
+  let title, body;
+  if (!entry_ || (!entry_.transport && !entry_.cafeteria && (!entry_.food || entry_.food.length === 0))) {
+    title = `⚠️ Schindlergooses – ${dayName}`;
+    body  = `Für morgen (${dayName}) ist noch nichts eingetragen. Bitte ausfüllen! 🪿`;
+  } else {
+    let parts = [];
+    if (entry_.transport) parts.push(`🚗 ${entry_.transport}`);
+    if (entry_.abfahrt)   parts.push(`⏰ Abfahrt: ${entry_.abfahrt}`);
+    if (entry_.cafeteria) parts.push('🍽️ Cafeteria');
+    if (entry_.food && entry_.food.length) parts.push(`🥡 Mitgebracht: ${entry_.food.length}×`);
+    if (entry_.note)      parts.push(`📝 ${entry_.note}`);
+    title = `🪿 Morgen – ${dayName}`;
+    body  = parts.join('\n');
+  }
+
+  await swReg.showNotification(title, {
+    body, icon: './icon.png', badge: './icon.png',
+    tag: 'daily-reminder', renotify: true,
+    vibrate: [200, 100, 200], requireInteraction: true
+  });
+}
+
+// Init on load
+initServiceWorker();
+</script>
+</body>
+</html>
