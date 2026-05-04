@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4e6232">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Schindlergooses">
+<title>Schindlergooses</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+
+<!-- Firebase compat (works without bundler / local file) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+
+<style>
+  :root {
+    --bg:       #f4efe6;
+    --surface:  #fdfaf4;
+    --surface2: #ede8db;
+    --border:   #d8d0be;
+    --accent:   #4e6232;
+    --accent2:  #8b4e2f;
+    --text:     #28200f;
+    --muted:    #9a8f7a;
+    --danger:   #a33b2a;
+    --r:        20px;
+    --r-sm:     13px;
+    --sh:       0 2px 16px rgba(44,36,24,0.09);
+  }
+
+  /* Dark mode intentionally disabled – light only */
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100%;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 40px);
+  }
+
+  /* ─── HEADER ─── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1.5px solid var(--border);
+    padding: 14px 18px 12px;
+    padding-top: calc(env(safe-area-inset-top) + 14px);
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: var(--sh);
+  }
+
+  .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .logo-wrap    { display: flex; align-items: center; gap: 10px; }
+
+  .goose-badge {
+    width: 44px; height: 44px;
+    background: var(--accent); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+
+  .logo-text { display: flex; flex-direction: column; gap: 1px; }
+  .logo-name { font-size: 18px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; line-height: 1.1; }
+  .logo-name span { color: var(--accent); }
+  .logo-sub  { font-size: 10px; font-weight: 500; color: var(--muted); letter-spacing: 1.2px; text-transform: uppercase; }
+
+  .icon-btn {
+    width: 44px; height: 44px;
+    background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 18px; color: var(--muted); flex-shrink: 0;
+    transition: border-color 0.2s;
+  }
+  .icon-btn:active { border-color: var(--accent); opacity: 0.7; }
+
+  /* ─── SYNC ─── */
+  .sync-bar {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 16px; font-size: 11px; font-weight: 500; color: var(--muted);
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .sync-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0;
+  }
+  .sync-dot.ok      { background: #5cb85c; }
+  .sync-dot.syncing { background: #e6a817; animation: blink 1s infinite; }
+  .sync-dot.error   { background: var(--danger); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ─── WEEK NAV ─── */
+  .week-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 14px 16px 0;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--r); overflow: hidden; box-shadow: var(--sh);
+  }
+  .week-btn {
+    min-width: 56px; height: 52px; background: none; border: none;
+    color: var(--muted); font-size: 22px; font-family: inherit;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .week-btn:active { background: var(--surface2); color: var(--accent); }
+  .week-label-wrap { flex: 1; text-align: center; }
+  .week-label-main { font-size: 14px; font-weight: 700; color: var(--text); display: block; }
+  .week-label-sub  { font-size: 10px; font-weight: 500; color: var(--muted); display: block; }
+
+  /* ─── OVERVIEW ─── */
+  .overview { margin: 10px 16px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ov-item  { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r-sm); padding: 12px 14px; box-shadow: var(--sh); }
+  .ov-label { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .ov-val   { font-size: 26px; font-weight: 800; line-height: 1; }
+  .ov-val.rico { color: var(--accent); }
+  .ov-val.ana  { color: var(--accent2); }
+
+  /* ─── DAYS ─── */
+  .days { padding: 10px 16px 0; display: flex; flex-direction: column; gap: 8px; }
+
+  .day-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--r); box-shadow: var(--sh); overflow: hidden;
+  }
+  .day-card.today { border-color: var(--accent); }
+
+  .day-hd {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px; cursor: pointer; user-select: none; min-height: 60px;
+  }
+  .day-hd-left { display: flex; align-items: center; gap: 10px; }
+  .day-name { font-size: 16px; font-weight: 800; }
+  .day-date { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .today-tag {
+    background: var(--accent); color: #fff;
+    font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 50px;
+  }
+  .day-hd-right { display: flex; align-items: center; gap: 5px; }
+
+  .pill { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 50px; }
+  .pill-t { background: rgba(78,98,50,0.12); color: var(--accent); border: 1px solid rgba(78,98,50,0.22); }
+  .pill-f { background: rgba(139,78,47,0.1); color: var(--accent2); border: 1px solid rgba(139,78,47,0.2); }
+
+  .chevron { font-size: 14px; color: var(--muted); transition: transform 0.25s; flex-shrink: 0; }
+  .day-card.open .chevron { transform: rotate(180deg); }
+
+  .day-bd { display: none; padding: 0 18px 20px; }
+  .day-card.open .day-bd { display: block; }
+
+  .hr { height: 1px; background: var(--border); margin-bottom: 16px; }
+
+  .mod-label { font-size: 11px; color: var(--muted); font-weight: 500; margin-bottom: 14px; display: flex; align-items: center; gap: 5px; }
+
+  .sec { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 10px; }
+
+  /* ─── TRANSPORT ─── */
+  .transport-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+
+  .t-chip {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-radius: var(--r-sm);
+    border: 1.5px solid var(--border); background: var(--surface2);
+    cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600;
+    color: var(--muted); width: 100%; text-align: left; transition: all 0.15s;
+  }
+  .t-chip:active { opacity: 0.7; }
+  .t-chip.sel-rico    { border-color: var(--accent);  color: var(--accent);  background: rgba(78,98,50,0.09); }
+  .t-chip.sel-ana     { border-color: var(--accent2); color: var(--accent2); background: rgba(139,78,47,0.09); }
+  .t-chip.sel-neutral { border-color: var(--muted);   color: var(--text);    background: var(--surface2); }
+  .t-chip-icon { font-size: 20px; flex-shrink: 0; }
+
+  /* ─── ABFAHRT ─── */
+  .abfahrt-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; background: var(--surface2);
+    border: 1.5px solid var(--border); border-radius: var(--r-sm); margin-bottom: 16px;
+  }
+  .abfahrt-label { font-size: 13px; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+  .abfahrt-input {
+    background: none; border: none; outline: none;
+    font-family: inherit; font-size: 24px; font-weight: 800;
+    color: var(--text); flex: 1; cursor: pointer; min-width: 0;
+  }
+  .abfahrt-input::-webkit-datetime-edit-ampm-field { display: none !important; }
+  .abfahrt-input::-webkit-calendar-picker-indicator { opacity: 0.3; cursor: pointer; width: 24px; height: 24px; }
+
+  /* ─── FOOD ─── */
+  .food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .f-card {
+    border-radius: var(--r-sm); border: 1.5px solid var(--border); background: var(--surface2);
+    padding: 13px 14px; cursor: pointer; min-height: 64px;
+    display: flex; flex-direction: column; justify-content: center; gap: 3px; transition: all 0.15s;
+  }
+  .f-card:active { opacity: 0.7; }
+  .f-card.sel-rico { border-color: var(--accent);  background: rgba(78,98,50,0.09); }
+  .f-card.sel-ana  { border-color: var(--accent2); background: rgba(139,78,47,0.09); }
+  .f-card.sel-cafe { border-color: var(--muted);   background: var(--surface); }
+  .f-card.cafe-card { grid-column: span 2; min-height: 52px; margin-top: 0; }
+
+  .f-who { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
+  .f-who.rico { color: var(--accent); }
+  .f-who.ana  { color: var(--accent2); }
+  .f-who.muted { color: var(--muted); }
+  .f-lbl { font-size: 14px; font-weight: 700; color: var(--text); }
+
+  /* ─── NOTE ─── */
+  .note-input {
+    width: 100%; margin-top: 14px; padding: 14px 16px;
+    background: var(--surface2); border: 1.5px solid var(--border);
+    border-radius: var(--r-sm); font-family: inherit; font-size: 14px;
+    color: var(--text); resize: none; min-height: 70px; outline: none;
+  }
+  .note-input:focus { border-color: var(--accent); }
+
+  /* ─── NOTIFICATION SECTION ─── */
+  .notif-section {
+    margin: 14px 16px 0;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--r); padding: 18px; box-shadow: var(--sh);
+  }
+  .notif-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .notif-status { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+
+  .notif-btn {
+    width: 100%; padding: 14px;
+    background: var(--surface2); border: 1.5px solid var(--border);
+    border-radius: var(--r-sm); font-family: inherit; font-size: 14px; font-weight: 700;
+    color: var(--muted); cursor: pointer; transition: all 0.2s;
+  }
+  .notif-btn.active {
+    background: rgba(78,98,50,0.1); border-color: var(--accent); color: var(--accent);
+  }
+  .notif-btn:active { opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="logo-wrap">
+      <div class="goose-badge">
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+          <ellipse cx="16" cy="20" rx="10" ry="8" fill="#fff" opacity="0.92"/>
+          <ellipse cx="22" cy="12" rx="5" ry="7" fill="#fff" opacity="0.92"/>
+          <ellipse cx="24" cy="9" rx="3" ry="2" fill="#e6a817"/>
+          <circle cx="25" cy="8" r="1" fill="#28200f"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <div class="logo-name">Schindler<span>gooses</span></div>
+        <div class="logo-sub">Carpool &amp; Food</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sync-bar">
+  <div class="sync-dot" id="syncDot"></div>
+  <span id="syncLabel">Verbinde…</span>
+</div>
+
+<div class="week-nav">
+  <button class="week-btn" onclick="changeWeek(-1)">‹</button>
+  <div class="week-label-wrap">
+    <span class="week-label-main" id="weekMain"></span>
+    <span class="week-label-sub"  id="weekSub"></span>
+  </div>
+  <button class="week-btn" onclick="changeWeek(1)">›</button>
+</div>
+
+<div class="overview">
+  <div class="ov-item">
+    <div class="ov-label">🚗 Rico fährt</div>
+    <div class="ov-val rico" id="ovRico">—</div>
+  </div>
+  <div class="ov-item">
+    <div class="ov-label">🚗 Ana fährt</div>
+    <div class="ov-val ana" id="ovAna">—</div>
+  </div>
+</div>
+
+<div class="days" id="days"></div>
+
+<!-- Notification Section -->
+<div class="notif-section">
+  <div class="notif-title">🔔 Abend-Erinnerungen</div>
+  <div class="notif-status" id="notifStatus">Täglich um 19:00 – Zusammenfassung für den nächsten Arbeitstag.</div>
+  <button class="notif-btn" id="notifBtn" onclick="handleNotifBtn()">🔔 Abend-Erinnerungen aktivieren</button>
+</div>
+
+<script>
+// ── Firebase Init ────────────────────────────────────────────────────────────
+firebase.initializeApp({
+  apiKey: "AIzaSyBtC4HBb01I5wFxi7b6wGrnWvRLoxZnGXc",
+  authDomain: "schindlergooses.firebaseapp.com",
+  databaseURL: "https://schindlergooses-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "schindlergooses",
+  storageBucket: "schindlergooses.firebasestorage.app",
+  messagingSenderId: "247916300788",
+  appId: "1:247916300788:web:226174e1941e98e0d211a1"
+});
+
+const db = firebase.database();
+
+// ── State ────────────────────────────────────────────────────────────────────
+let data     = {};
+let weekOffset = 0;
+let currentWk  = '';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const DAYS = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
+
+function mondayOf(offset) {
+  const d = new Date();
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - day + 1 + offset * 7);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function weekDates(mon) {
+  return Array.from({length:5}, (_,i) => {
+    const d = new Date(mon); d.setDate(mon.getDate()+i); return d;
+  });
+}
+
+function isToday(d) {
+  const t = new Date();
+  return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate();
+}
+
+function fmtDate(d) {
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function weekKey(mon) { return mon.toISOString().slice(0,10); }
+
+function entry(wk,i) {
+  return data[wk]?.[i] || { transport:'', abfahrt:'', food:[], cafeteria:false, note:'' };
+}
+
+function pills(e) {
+  let h = '';
+  if (e.transport) {
+    const cls = e.transport.includes('Rico') ? 'pill-t' : e.transport.includes('Ana') ? 'pill-f' : '';
+    h += `<span class="pill ${cls}">${e.transport.split(' ')[0]}</span>`;
+  }
+  if (e.food?.length || e.cafeteria) h += `<span class="pill pill-f">🍽️ ${(e.food?.length||0)+(e.cafeteria?1:0)}</span>`;
+  return h;
+}
+
+function modLabel(e) {
+  if (!e._modBy) return '';
+  return `<div class="mod-label">✏️ Zuletzt geändert von <strong>${e._modBy}</strong></div>`;
+}
+
+function syncStatus(state, label) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  if (dot) { dot.className = 'sync-dot ' + state; }
+  if (lbl) lbl.textContent = label;
+}
+
+// ── Firebase Sync ─────────────────────────────────────────────────────────────
+db.ref('weeks').on('value', snap => {
+  data = snap.val() || {};
+  render();
+  syncStatus('ok', 'Synchronisiert');
+}, () => syncStatus('error', 'Verbindungsfehler'));
+
+// ── Week Nav ─────────────────────────────────────────────────────────────────
+function changeWeek(dir) { weekOffset += dir; render(); }
+
+// ── Data Mutations ───────────────────────────────────────────────────────────
+function setField(wk, i, field, val) {
+  syncStatus('syncing','Speichert…');
+  db.ref(`weeks/${wk}/${i}`).update({ [field]: val, _modBy: 'Rico' })
+    .then(()=>syncStatus('ok','Gespeichert'))
+    .catch(()=>syncStatus('error','Fehler beim Speichern'));
+}
+
+function setTransport(wk,i,label) {
+  const e = entry(wk,i);
+  setField(wk,i,'transport', e.transport===label ? '' : label);
+}
+
+function setAbfahrt(wk,i,val) { setField(wk,i,'abfahrt',val); }
+
+function toggleFood(wk,i,key) {
+  const e    = entry(wk,i);
+  const food = [...(e.food||[])];
+  const idx  = food.indexOf(key);
+  if (idx===-1) food.push(key); else food.splice(idx,1);
+  setField(wk,i,'food',food);
+}
+
+function toggleCafe(wk,i) {
+  setField(wk,i,'cafeteria',!entry(wk,i).cafeteria);
+}
+
+function setNote(wk,i,val) { setField(wk,i,'note',val); }
+
+function toggleDay(id) {
+  document.getElementById(id)?.classList.toggle('open');
+}
+
+// ── Overview ─────────────────────────────────────────────────────────────────
+function updateOverview() {
+  const wk = currentWk;
+  let rico=0, ana=0;
+  for (let i=0;i<5;i++) {
+    const t = entry(wk,i).transport||'';
+    if (t.includes('Rico')) rico++;
+    if (t.includes('Ana'))  ana++;
+  }
+  const r=document.getElementById('ovRico'), a=document.getElementById('ovAna');
+  if (r) r.textContent = rico+'×';
+  if (a) a.textContent = ana+'×';
+}
+
+// ── Transport & Food config ───────────────────────────────────────────────────
+const TRANSPORT = [
+  { label:'Rico fährt',   icon:'🚗', text:'Rico fährt',   who:'rico' },
+  { label:'Ana fährt',    icon:'🚗', text:'Ana fährt',    who:'ana'  },
+  { label:'OeV anderes',  icon:'🚌', text:'ÖV / anderes', who:'neutral' },
+];
+
+const FOOD = [
+  { key:'rico-home', lbl:'Mitgebracht', who:'Rico', wc:'rico', cls:'sel-rico' },
+  { key:'ana-home',  lbl:'Mitgebracht', who:'Ana',  wc:'ana',  cls:'sel-ana'  },
+];
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const mon  = mondayOf(weekOffset);
+  const wk   = weekKey(mon);
+  currentWk  = wk;
+  const dates = weekDates(mon);
+
+  const wMain = document.getElementById('weekMain');
+  const wSub  = document.getElementById('weekSub');
+  if (wMain) wMain.textContent = `KW ${getISOWeek(mon)} · ${mon.getFullYear()}`;
+  if (wSub)  wSub.textContent  = `${fmtDate(dates[0])} – ${fmtDate(dates[4])}`;
+
+  const open = {};
+  for (let i=0;i<5;i++) {
+    const el=document.getElementById(`day-${i}`);
+    if (el) open[i]=el.classList.contains('open');
+  }
+
+  document.getElementById('days').innerHTML = dates.map((date,i) => {
+    const e      = entry(wk,i);
+    const today  = isToday(date);
+    const isOpen = open[i]!==undefined ? open[i] : today;
+    const wkSafe = wk;
+
+    const tChips = TRANSPORT.map(o => {
+      const sel = e.transport===o.label;
+      const cls = sel ? (o.who==='rico'?'sel-rico':o.who==='ana'?'sel-ana':'sel-neutral') : '';
+      return `<button class="t-chip ${cls}" data-wk="${wkSafe}" data-day="${i}" data-label="${o.label}" onclick="setTransport(this.dataset.wk, parseInt(this.dataset.day), this.dataset.label)">
+        <span class="t-chip-icon">${o.icon}</span>${o.text}
+      </button>`;
+    }).join('');
+
+    const fCards = FOOD.map(o => `
+      <div class="f-card${e.food.includes(o.key)?' '+o.cls:''}" data-wk="${wkSafe}" data-day="${i}" data-key="${o.key}" onclick="toggleFood(this.dataset.wk, parseInt(this.dataset.day), this.dataset.key)">
+        <div class="f-who ${o.wc}">${o.who}</div>
+        <div class="f-lbl">${o.lbl}</div>
+      </div>`).join('');
+
+    return `
+    <div class="day-card${today?' today':''}${isOpen?' open':''}" id="day-${i}">
+      <div class="day-hd" data-id="day-${i}" onclick="toggleDay(this.dataset.id)">
+        <div class="day-hd-left">
+          <span class="day-name">${DAYS[i]}</span>
+          <span class="day-date">${fmtDate(date)}</span>
+          ${today?'<span class="today-tag">Heute</span>':''}
+        </div>
+        <div class="day-hd-right">${pills(e)}<span class="chevron">▾</span></div>
+      </div>
+      <div class="day-bd">
+        <div class="hr"></div>
+        ${modLabel(e)}
+
+        <div class="sec">Transport</div>
+        <div class="transport-grid">${tChips}</div>
+
+        <div class="sec">Abfahrt</div>
+        <div class="abfahrt-row">
+          <span class="abfahrt-label">⏰</span>
+          <input class="abfahrt-input" type="time" step="300" value="${e.abfahrt||''}"
+            data-wk="${wkSafe}" data-day="${i}"
+            onchange="setAbfahrt(this.dataset.wk, parseInt(this.dataset.day), this.value)"/>
+        </div>
+
+        <div class="sec">Essen</div>
+        <div class="food-grid">
+          ${fCards}
+          <div class="f-card cafe-card${e.cafeteria?' sel-cafe':''}" data-wk="${wkSafe}" data-day="${i}" onclick="toggleCafe(this.dataset.wk, parseInt(this.dataset.day))">
+            <div class="f-who muted">Beide</div>
+            <div class="f-lbl">🍽️ Cafeteria</div>
+          </div>
+        </div>
+
+        <textarea class="note-input" placeholder="Notiz…"
+          data-wk="${wkSafe}" data-day="${i}"
+          onchange="setNote(this.dataset.wk, parseInt(this.dataset.day), this.value)">${e.note||''}</textarea>
+      </div>
+    </div>`;
+  }).join('');
+
+  updateOverview();
+}
+
+function getISOWeek(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay()||7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+}
+
+// Initial render
+render();
+syncStatus('syncing', 'Verbinde…');
+
+// ── Push Notifications ──────────────────────────────────────────────────────
+let swReg = null;
+
+async function initServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    swReg = await navigator.serviceWorker.register('./sw.js');
+    console.log('SW registered');
+    updateNotifUI();
+
+    // Wenn Berechtigung bereits erteilt → Token direkt registrieren
+    if (Notification.permission === 'granted') {
+      await registerFCMToken();
+    }
+  } catch(e) {
+    console.warn('SW registration failed:', e);
+  }
+}
+
+async function registerFCMToken() {
+  try {
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({
+      vapidKey: 'BAQqCajzCe1D9Dx_St2wkkSUs6YjLviTt5ao_ZXSUhU8dulnD51ShVfOy5rltJMUpdj_U90XEO8EjwRy6VJj6nw',
+      serviceWorkerRegistration: swReg
+    });
+    if (token) {
+      const tokenKey = token.slice(-20);
+      await firebase.database().ref('fcmTokens/' + tokenKey).set(token);
+      console.log('FCM Token gespeichert ✅');
+    }
+  } catch(e) {
+    console.warn('FCM Token Fehler:', e);
+  }
+}
+
+function updateNotifUI() {
+  const btn    = document.getElementById('notifBtn');
+  const status = document.getElementById('notifStatus');
+  if (!btn) return;
+  const perm = Notification.permission;
+  if (perm === 'granted') {
+    btn.textContent = '🔔 Erinnerungen aktiv — Tippen für Test';
+    btn.classList.add('active');
+    status.textContent = 'Du erhältst jeden Abend um 19:00 Uhr eine Zusammenfassung für den nächsten Tag.';
+  } else if (perm === 'denied') {
+    btn.textContent = '🔕 Benachrichtigungen blockiert';
+    btn.classList.remove('active');
+    status.textContent = 'Bitte in den Einstellungen erlauben: Einstellungen → Safari → Mitteilungen.';
+  } else {
+    btn.textContent = '🔔 Abend-Erinnerungen aktivieren';
+    btn.classList.remove('active');
+    status.textContent = 'Täglich um 19:00 – Zusammenfassung für den nächsten Arbeitstag.';
+  }
+}
+
+async function handleNotifBtn() {
+  if (!('Notification' in window)) {
+    alert('Dein Browser unterstützt keine Benachrichtigungen.');
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    // Test-Notification senden
+    if (swReg) {
+      await swReg.showNotification('🪿 Schindlergooses – Test', {
+        body: 'Erinnerungen sind aktiv! Du wirst täglich um 19:00 informiert.',
+        icon: './icon.png',
+        badge: './icon.png',
+        tag: 'test'
+      });
+    }
+    return;
+  }
+  const result = await Notification.requestPermission();
+  updateNotifUI();
+  if (result === 'granted') {
+    await registerFCMToken();
+    if (swReg) {
+      await swReg.showNotification('🪿 Schindlergooses – Aktiviert!', {
+        body: 'Erinnerungen aktiv! Täglich um 19:00 bekommst du eine Zusammenfassung.',
+        icon: './icon.png',
+        badge: './icon.png',
+        tag: 'test'
+      });
+    }
+  }
+}
+
+// Init on load
+initServiceWorker();
+</script>
+</body>
+</html>
