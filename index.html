@@ -340,7 +340,8 @@ function fmtDate(d) {
 function weekKey(mon) { return mon.toISOString().slice(0,10); }
 
 function entry(wk,i) {
-  return data[wk]?.[i] || { transport:'', abfahrt:'', food:[], cafeteria:false, note:'' };
+  const raw = data[wk]?.[i] || {};
+  return { transport: raw.transport||'', abfahrt: raw.abfahrt||'', food: Array.isArray(raw.food) ? raw.food : [], cafeteria: raw.cafeteria||false, note: raw.note||'', _modBy: raw._modBy||'' };
 }
 
 function pills(e) {
